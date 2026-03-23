@@ -1,0 +1,15 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+httpx==0.25.2
+python-dotenv==1.0.0
+passlib[bcrypt]==1.7.4
+sqlalchemy==2.0.23
+aiosqlite==0.19.0
+asyncpg==0.29.0
+
+
+# Note: This project supports both pip and uv package managers
+# To use uv, install it first: pip install uv
+# Then run: uv sync
