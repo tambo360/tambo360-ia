@@ -3,9 +3,10 @@
 import os
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
+from app.config.settings import settings
 
-# Leemos de entorno, sino fallback a SQLite local
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./tambo_ai.db")
+# 👇 única fuente de verdad
+DATABASE_URL = settings.database_url
 
 engine = create_async_engine(DATABASE_URL, echo=False)
 

@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     
     # Logging Configuration
     log_level: str = "INFO"
+
+    database_url: str
     
     class Config:
         env_file = ".env"
