@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from pydantic import field_validator
+from pydantic import computed_field, field_validator
 from typing import Optional
 
 
@@ -33,6 +33,17 @@ class Settings(BaseSettings):
     db_host: str
     db_port: int = 5432
     db_name: str
+
+    @computed_field
+    @property
+    def async_database_url(self) -> str:
+        """Convierte esquemas 'postgres://' o 'postgresql://' al dialecto asyncpg."""
+        url = self.database_url
+        if url.startswith("postgres://"):
+            return url.replace("postgres://", "postgresql+asyncpg://", 1)
+        if url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
+            return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return url
 
     # 👇 CLAVE
     @field_validator("cors_origins", mode="before")
