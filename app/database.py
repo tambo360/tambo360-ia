@@ -6,7 +6,8 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from app.config.settings import settings
 
 # 👇 única fuente de verdad
-DATABASE_URL = settings.database_url
+# DATABASE_URL = settings.database_url
+DATABASE_URL = settings.async_database_url
 
 engine = create_async_engine(DATABASE_URL, echo=False)
 
