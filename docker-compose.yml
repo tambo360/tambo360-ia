@@ -1,4 +1,22 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
   fastapi-app:
     build:
       context: .
@@ -11,8 +29,18 @@ services:
       - APP_NAME=${APP_NAME:-FastAPI AI Template}
       - APP_VERSION=${APP_VERSION:-1.0.0}
       - DEBUG=${DEBUG:-false}
+      - PORT=${API_PORT:-8000}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=${DB_NAME}
+      - DATABASE_URL=postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
     volumes:
       - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
@@ -21,7 +49,10 @@ services:
       retries: 3
       start_period: 40s
 
-  # Optional: Add nginx for production
+volumes:
+  postgres_data:
+
+# Optional: Add nginx for production
   # nginx:
   #   image: nginx:alpine
   #   ports:

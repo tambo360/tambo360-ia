@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     database_url: str
+    db_user: str
+    db_password: str
+    db_host: str
+    db_port: int = 5432
+    db_name: str
 
     # 👇 CLAVE
     @field_validator("cors_origins", mode="before")
