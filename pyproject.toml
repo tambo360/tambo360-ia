@@ -1,7 +1,7 @@
 [project]
 name = "fastapi-ai-template"
 version = "1.0.0"
-description = "FastAPI template with OpenRouter AI integration"
+description = "Tambo360 IA API with LangChain Google Gemini integration"
 authors = [
     {name = "Your Name", email = "your.email@example.com"}
 ]
@@ -23,12 +23,12 @@ classifiers = [
 dependencies = [
     "fastapi[standard]>=0.104.1",
     "uvicorn[standard]>=0.24.0",
-    "pydantic>=2.5.0",
+    "pydantic>=2.7.0",
     "pydantic-settings>=2.1.0",
     "httpx>=0.25.2",
     "python-dotenv>=1.0.0",
     "passlib[bcrypt]>=1.7.4",
-    "langchain>=1.4.1",
+    "langchain-core>=1.4.1",
     "langchain-google-genai>=4.4.0",
     "sqlalchemy>=2.0.54",
     "asyncpg>=0.31.0",

@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
-    description="FastAPI template with OpenRouter AI integration",
+    description="Tambo360 IA API — análisis de merma con Gemini (LangChain)",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -63,13 +63,6 @@ async def read_root():
         docs="/docs",
         health="/api/v1/health"
     )
-
-
-# Legacy endpoint for backward compatibility
-@app.get("/items/{item_id}")
-async def read_item(item_id: int, q: str | None = None):
-    """Example endpoint from original template."""
-    return {"item_id": item_id, "q": q}
 
 
 if __name__ == "__main__":

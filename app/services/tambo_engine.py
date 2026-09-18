@@ -5,18 +5,17 @@ Receives ALL lots of an establishment (≥15), groups them by category
 human-readable descriptions for the already-identified outlier lots.
 """
 
-import json
 from collections import defaultdict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.db_models import PromedioCategoria
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+
 from app.models.schemas import (
     TamboAnalysisInput,
     TamboAnalysisOutput,
     AlertaLote,
-    ChatRequest,
-    ChatMessage,
-    LoteInput,
+    OutlierDescripcionesIA,
 )
 from app.services.ai_service import ai_service
 from app.core.logging import get_logger
@@ -198,14 +197,14 @@ async def evaluate_single_lote(data: TamboAnalysisInput, db: AsyncSession) -> li
 # ---- Prompt builder -------------------------------------------------------
 
 
-def build_prompt(outliers: list[dict], data: TamboAnalysisInput) -> list[ChatMessage]:
+def build_prompt(outliers: list[dict], data: TamboAnalysisInput) -> list[BaseMessage]:
     """
     Build system + user messages.
     Python already identified the outlier lots and computed all numbers.
     The AI only writes a short, objective description for each.
     """
     if not outliers:
-        return []  # No call needed
+        return []
 
     outliers_text = "\n".join([
         f"- numeroLote: {o['numeroLote']} | Producto: {o['producto']} | Categoría: {o['categoria']}"
@@ -217,35 +216,24 @@ def build_prompt(outliers: list[dict], data: TamboAnalysisInput) -> list[ChatMes
         for o in outliers
     ])
 
-    schema_example = json.dumps(
-        [
-            {
-                "idLote": "<id del lote>",
-                "descripcion": "Descripción técnica y objetiva del desvío de merma",
-            }
-        ],
-        ensure_ascii=False,
-        indent=2,
-    )
-
-    system_message = ChatMessage(
-        role="system",
+    system_message = SystemMessage(
         content=(
             "Eres un analista técnico de producción lechera y quesera.\n\n"
             "Los cálculos ya están hechos. Tu única tarea es redactar una descripción "
             "técnica y objetiva del desvío de merma para cada lote que se te indica.\n\n"
             "REGLAS:\n"
-            "1. Responde ÚNICAMENTE con un JSON válido: una lista de objetos con 'idLote' y 'descripcion'. Nota: usa el 'numeroLote' recibido como idLote en tu JSON de respuesta.\n"
-            "2. Sin texto adicional, sin markdown, sin explicaciones fuera del JSON.\n"
-            "3. La descripción debe mencionar la merma absoluta, el % de merma del lote, el % de merma promedio de la categoría, el porcentaje de desvío y EL NOMBRE de la categoría (ej: 'la categoría quesos'). Referencia al lote específico anteponiendo una 'L' mayúscula al número (ej: 'el lote L8').\n"
-            "4. Máximo 2 oraciones por descripción. Tono técnico.\n"
-            "5. La descripción debe comenzar SIEMPRE nombrando al lote específico, por ejemplo: 'El lote L21 de la categoría leches presentó...'\n\n"
-            f"Formato exacto:\n{schema_example}"
+            "1. En idLote usá el numeroLote recibido (el número correlativo), no un UUID.\n"
+            "2. La descripción debe mencionar la merma absoluta, el % de merma del lote, "
+            "el % de merma promedio de la categoría, el porcentaje de desvío y EL NOMBRE "
+            "de la categoría (ej: 'la categoría quesos'). Referencia al lote específico "
+            "anteponiendo una 'L' mayúscula al número (ej: 'el lote L8').\n"
+            "3. Máximo 2 oraciones por descripción. Tono técnico.\n"
+            "4. La descripción debe comenzar SIEMPRE nombrando al lote específico, "
+            "por ejemplo: 'El lote L21 de la categoría leches presentó...'"
         ),
     )
 
-    user_message = ChatMessage(
-        role="user",
+    user_message = HumanMessage(
         content=(
             f"Establecimiento: '{data.nombreEstablecimiento}' (ID: {data.idEstablecimiento}).\n\n"
             f"Lotes con desvío de merma detectado:\n{outliers_text}\n\n"
@@ -256,51 +244,31 @@ def build_prompt(outliers: list[dict], data: TamboAnalysisInput) -> list[ChatMes
     return [system_message, user_message]
 
 
-# ---- Model call -----------------------------------------------------------
-
-
-async def call_model(messages: list[ChatMessage]) -> str:
-    """Call OpenRouter via ai_service and return raw content string."""
-    request = ChatRequest(
-        messages=messages,
-        temperature=0.1,
-        max_tokens=1500,
-        stream=False,
+def _fallback_description(o: dict) -> str:
+    return (
+        f"El lote L{o['numeroLote']} presenta una merma de {o['merma_total']} {o['unidad']} "
+        f"(que es el {o['pct_merma_lote']}% de su volumen total), "
+        f"superando en un {o['porcentaje_sobre_promedio']}% el porcentaje promedio de la categoría "
+        f"{o['categoria']} (que es tan solo {o['promedio_categoria_pct']}%)."
     )
-    response = await ai_service.chat_completion(request)
-    content = response.choices[0]["message"]["content"]
-    logger.info("Raw AI response received, proceeding to validate")
-    return content
 
 
-# ---- Response validation -------------------------------------------------
-
-
-def merge_descriptions(raw: str, outliers: list[dict], data: TamboAnalysisInput) -> list[AlertaLote]:
-    """
-    Parse AI descriptions and merge with pre-computed outlier data.
-    If AI fails, fall back to generating the description from the numbers.
-    """
+def merge_descriptions(
+    parsed: OutlierDescripcionesIA | None,
+    outliers: list[dict],
+) -> list[AlertaLote]:
+    """Merge Gemini descriptions with pre-computed outlier data."""
     descriptions: dict[str, str] = {}
-
-    cleaned = raw.strip()
-    if cleaned.startswith("```"):
-        lines = cleaned.split("\n")
-        cleaned = "\n".join(lines[1:-1]).strip()
-
-    try:
-        parsed = json.loads(cleaned)
-        for item in parsed:
-            descriptions[str(item.get("idLote", ""))] = item.get("descripcion", "")
-    except Exception as e:
-        logger.warning(f"Could not parse AI descriptions, using fallback: {e}")
+    if parsed:
+        for item in parsed.descripciones:
+            descriptions[str(item.idLote)] = item.descripcion
 
     alertas = []
     for o in outliers:
-        desc = descriptions.get(str(o["numeroLote"])) or (
-            f"El lote L{o['numeroLote']} presenta una merma de {o['merma_total']} {o['unidad']} (que es el {o['pct_merma_lote']}% de su volumen total), "
-            f"superando en un {o['porcentaje_sobre_promedio']}% el porcentaje promedio de la categoría "
-            f"{o['categoria']} (que es tan solo {o['promedio_categoria_pct']}%)."
+        desc = (
+            descriptions.get(str(o["numeroLote"]))
+            or descriptions.get(str(o["idLote"]))
+            or _fallback_description(o)
         )
         alertas.append(
             AlertaLote(
@@ -333,12 +301,14 @@ async def analyze(data: TamboAnalysisInput, db: AsyncSession) -> TamboAnalysisOu
     alertas: list[AlertaLote] = []
 
     if outliers:
-        # Step 2: AI only writes descriptions for the identified outliers
         messages = build_prompt(outliers, data)
+        parsed: OutlierDescripcionesIA | None = None
         if messages:
-            raw_response = await call_model(messages)
-            # Step 3: Merge AI descriptions with pre-computed data
-            alertas = merge_descriptions(raw_response, outliers, data)
+            try:
+                parsed = await ai_service.generate_outlier_descriptions(messages)
+            except Exception as e:
+                logger.warning(f"Gemini structured output failed, using fallback: {e}")
+        alertas = merge_descriptions(parsed, outliers)
     else:
         logger.info("No outliers detected, skipping AI call")
 

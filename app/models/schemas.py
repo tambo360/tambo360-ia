@@ -1,41 +1,41 @@
 """Pydantic models for request/response schemas."""
 
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 from datetime import datetime
 
 
-class ChatMessage(BaseModel):
-    """Chat message model."""
-    role: str = Field(..., description="Message role: 'user', 'assistant', or 'system'")
-    content: str = Field(..., description="Message content")
+# class ChatMessage(BaseModel):
+#     """Chat message model."""
+#     role: str = Field(..., description="Message role: 'user', 'assistant', or 'system'")
+#     content: str = Field(..., description="Message content")
 
 
-class ChatRequest(BaseModel):
-    """Chat completion request model."""
-    model: str = Field(default="arcee-ai/trinity-large-preview:free", description="AI model to use")
-    messages: List[ChatMessage] = Field(..., description="List of chat messages")
-    max_tokens: Optional[int] = Field(default=1000, ge=1, le=4096, description="Maximum tokens to generate")
-    temperature: Optional[float] = Field(default=0.7, ge=0.0, le=2.0, description="Sampling temperature")
-    stream: Optional[bool] = Field(default=False, description="Enable streaming response")
+# class ChatRequest(BaseModel):
+#     """Chat completion request model."""
+#     model: str = Field(default="arcee-ai/trinity-large-preview:free", description="AI model to use")
+#     messages: List[ChatMessage] = Field(..., description="List of chat messages")
+#     max_tokens: Optional[int] = Field(default=1000, ge=1, le=4096, description="Maximum tokens to generate")
+#     temperature: Optional[float] = Field(default=0.7, ge=0.0, le=2.0, description="Sampling temperature")
+#     stream: Optional[bool] = Field(default=False, description="Enable streaming response")
 
 
-class ChatResponse(BaseModel):
-    """Chat completion response model."""
-    id: str = Field(..., description="Response ID")
-    object: str = Field(default="chat.completion", description="Object type")
-    created: int = Field(..., description="Creation timestamp")
-    model: str = Field(..., description="Model used")
-    choices: List[Dict[str, Any]] = Field(..., description="Response choices")
-    usage: Optional[Dict[str, Any]] = Field(default=None, description="Token usage information")
+# class ChatResponse(BaseModel):
+#     """Chat completion response model."""
+#     id: str = Field(..., description="Response ID")
+#     object: str = Field(default="chat.completion", description="Object type")
+#     created: int = Field(..., description="Creation timestamp")
+#     model: str = Field(..., description="Model used")
+#     choices: List[Dict[str, Any]] = Field(..., description="Response choices")
+#     usage: Optional[Dict[str, Any]] = Field(default=None, description="Token usage information")
 
 
-class ModelInfo(BaseModel):
-    """AI model information."""
-    id: str = Field(..., description="Model ID")
-    name: Optional[str] = Field(default=None, description="Model display name")
-    description: Optional[str] = Field(default=None, description="Model description")
-    pricing: Optional[Dict[str, Any]] = Field(default=None, description="Pricing information")
+# class ModelInfo(BaseModel):
+#     """AI model information."""
+#     id: str = Field(..., description="Model ID")
+#     name: Optional[str] = Field(default=None, description="Model display name")
+#     description: Optional[str] = Field(default=None, description="Model description")
+#     pricing: Optional[Dict[str, Any]] = Field(default=None, description="Pricing information")
 
 
 class HealthResponse(BaseModel):
@@ -138,3 +138,29 @@ class AlertaResponse(BaseModel):
 class AlertasNoVistasResponse(BaseModel):
     """Result for counting unread alerts."""
     cantidad: int = Field(..., description="Cantidad de alertas no leídas (visto = False)")
+
+
+# ---------------------------------------------------------------------------
+# TamboEngine — Schema for Gemini structured output (LangChain)
+# ---------------------------------------------------------------------------
+
+class OutlierDescripcionIA(BaseModel):
+    """One outlier description produced by Gemini."""
+
+    idLote: str = Field(
+        ...,
+        description="Número correlativo del lote (numeroLote), no el UUID",
+    )
+    descripcion: str = Field(
+        ...,
+        description="Descripción técnica y objetiva del desvío de merma",
+    )
+
+
+class OutlierDescripcionesIA(BaseModel):
+    """Root object returned by with_structured_output."""
+
+    descripciones: List[OutlierDescripcionIA] = Field(
+        default_factory=list,
+        description="Una descripción por cada lote con desvío",
+    )
