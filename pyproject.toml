@@ -30,6 +30,8 @@ dependencies = [
     "passlib[bcrypt]>=1.7.4",
     "langchain>=1.4.1",
     "langchain-google-genai>=4.4.0",
+    "sqlalchemy>=2.0.54",
+    "asyncpg>=0.31.0",
 ]
 
 [project.optional-dependencies]
