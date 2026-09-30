@@ -1,9 +1,10 @@
 """Pydantic models for request/response schemas."""
 
-from pydantic import BaseModel, Field
-from typing import List, Optional
+import math
 from datetime import datetime
+from typing import List, Literal, Optional
 
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator
 
 # class ChatMessage(BaseModel):
 #     """Chat message model."""
@@ -120,6 +121,81 @@ class TamboAnalysisOutput(BaseModel):
         default=[],
         description="Una alerta por cada lote problemático. Vacía si no hay desvíos."
     )
+
+
+def _validate_finite_json(value: JsonValue) -> JsonValue:
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ValueError("JSON numeric values must be finite")
+    if isinstance(value, dict):
+        for nested_value in value.values():
+            _validate_finite_json(nested_value)
+    elif isinstance(value, list):
+        for nested_value in value:
+            _validate_finite_json(nested_value)
+    return value
+
+
+PredictionTopic = Literal[
+    "clima",
+    "docs",
+    "finanzas",
+    "merma",
+    "movimientos",
+    "produccion",
+    "sanidad",
+]
+
+
+class PredictionRequest(BaseModel):
+    """Backend-provided data and configuration for a supported prediction topic."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tema: PredictionTopic = Field(..., description="Tema habilitado para predicción")
+    datos: dict[str, JsonValue] = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="Datos de entrada específicos del tema",
+    )
+    configuracion: dict[str, JsonValue] = Field(
+        default_factory=dict,
+        max_length=50,
+        description="Parámetros opcionales para orientar la predicción",
+    )
+
+    @field_validator("datos", "configuracion")
+    @classmethod
+    def validate_finite_json(cls, value: dict[str, JsonValue]) -> dict[str, JsonValue]:
+        return _validate_finite_json(value)
+
+
+class PredictionResult(BaseModel):
+    """Structured prediction generated for a supported topic."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    prediccion: dict[str, JsonValue] = Field(
+        ...,
+        min_length=1,
+        description="Resultado estructurado específico del tema",
+    )
+    horizonte: str = Field(..., min_length=1, max_length=100)
+    confianza: float = Field(..., ge=0, le=1)
+    explicacion: str = Field(..., min_length=1, max_length=1500)
+
+    @field_validator("prediccion")
+    @classmethod
+    def validate_finite_prediction(
+        cls, value: dict[str, JsonValue]
+    ) -> dict[str, JsonValue]:
+        return _validate_finite_json(value)
+
+
+class PredictionResponse(PredictionResult):
+    """Common API response envelope for predictions across topics."""
+
+    tema: PredictionTopic = Field(..., description="Tema de la predicción")
 
 
 class AlertaResponse(BaseModel):

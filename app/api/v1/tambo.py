@@ -1,25 +1,40 @@
 """TamboEngine API endpoints — HU3 (analyze) and HU4 (alertas)."""
 
-import json
-from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from typing import List
 
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.logging import get_logger
+from app.database import get_db
+from app.models.db_models import Alerta
 from app.models.schemas import (
-    TamboAnalysisInput,
-    TamboAnalysisOutput,
     AlertaResponse,
     AlertasNoVistasResponse,
+    PredictionRequest,
+    PredictionResponse,
+    TamboAnalysisInput,
+    TamboAnalysisOutput,
 )
-from app.models.db_models import Alerta
-from app.database import get_db
 from app.services import tambo_engine
-from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/tambo", tags=["tambo"])
+
+
+@router.post("/predict", response_model=PredictionResponse)
+async def predict(data: PredictionRequest):
+    """Generate a structured prediction for a supported topic."""
+    try:
+        return await tambo_engine.predict(data)
+    except Exception as e:
+        logger.error("Prediction failed: %s", e)
+        raise HTTPException(
+            status_code=503,
+            detail="El servicio de IA no pudo completar la predicción",
+        ) from e
 
 
 # ---------------------------------------------------------------------------

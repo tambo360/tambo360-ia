@@ -4,9 +4,9 @@ from langchain_core.messages import BaseMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.config.settings import settings
-from app.models.schemas import OutlierDescripcionesIA
 from app.core.logging import get_logger
 from app.core.security import mask_api_key
+from app.models.schemas import OutlierDescripcionesIA, PredictionResult
 
 logger = get_logger(__name__)
 
@@ -36,6 +36,10 @@ class AIService:
             OutlierDescripcionesIA,
             method="json_schema",
         )
+        self.prediction_llm = self.llm.with_structured_output(
+            PredictionResult,
+            method="json_schema",
+        )
         logger.info(
             f"AI Service initialized with Gemini model={settings.gemini_model}, "
             f"key={mask_api_key(settings.google_api_key)}"
@@ -52,6 +56,17 @@ class AIService:
         logger.info(
             f"Structured AI response received: {len(result.descripciones)} descriptions"
         )
+        return result
+
+    async def generate_prediction(
+        self, messages: list[BaseMessage]
+    ) -> PredictionResult:
+        """Ask Gemini for a validated, topic-specific prediction."""
+        logger.info(f"Requesting structured prediction via {settings.gemini_model}")
+        result = await self.prediction_llm.ainvoke(messages)
+        if isinstance(result, dict):
+            result = PredictionResult.model_validate(result)
+        logger.info("Structured prediction received")
         return result
 
     async def close(self):
