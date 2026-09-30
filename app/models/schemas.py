@@ -164,3 +164,23 @@ class OutlierDescripcionesIA(BaseModel):
         default_factory=list,
         description="Una descripción por cada lote con desvío",
     )
+
+
+# ---------------------------------------------------------------------------
+# Supervisor conversational agent
+# ---------------------------------------------------------------------------
+
+class AgentAskRequest(BaseModel):
+    """User question routed through the coordinator + subagents."""
+
+    query: str = Field(..., min_length=1, description="Pregunta en lenguaje natural")
+    establecimiento_id: Optional[str] = Field(
+        default=None,
+        description="Contexto opcional para que el supervisor lo pase a los subagentes",
+    )
+
+
+class AgentAskResponse(BaseModel):
+    """Final coordinator answer after optional subagent calls."""
+
+    respuesta: str = Field(..., description="Texto sintetizado por el supervisor")

@@ -29,6 +29,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "passlib[bcrypt]>=1.7.4",
     "langchain-core>=1.4.1",
+    "langchain>=1.0.0",
     "langchain-google-genai>=4.4.0",
     "sqlalchemy>=2.0.54",
     "asyncpg>=0.31.0",
